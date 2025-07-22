@@ -2,7 +2,9 @@
 
 **A Python tool for prepress teams** — automatically detect and crop art from imposed PDF layouts via a simple GUI.
 
-![Demo Screenshot](docs/screenshot.png)
+
+![demo screenshot](https://github.com/user-attachments/assets/5841d449-4188-48e9-aaa2-285aae0064ca)
+
 
 ---
 
