@@ -79,69 +79,87 @@ def gather_settings():
     return pdf_path, rows, cols
 
 def preview_and_crop(pdf_path, rows, cols):
+
     doc = fitz.open(pdf_path)
     page = doc[0]
     pix = page.get_pixmap(dpi=150)
-    base = np.array(Image.frombytes("RGB",[pix.width,pix.height],pix.samples))
+    base = np.array(Image.frombytes("RGB", [pix.width, pix.height], pix.samples))
     h, w = base.shape[:2]
     pw, ph = page.rect.width, page.rect.height
-    cw, ch = w/cols, h/rows
+    scale = 1.0  # initial scale
+    min_scale = 0.2
+    max_scale = 3.0
 
     selected = set()
     banner_h = 60
-    instr = "L-click: select | R-click: deselect | S: save & exit | Q: cancel"
+    instr = "L-click: select | R-click: deselect | S: save & exit | Q: cancel | +/-: zoom"
 
     def draw_frame():
-        img = base.copy()
+        # scale the base image
+        scaled_w, scaled_h = int(w * scale), int(h * scale)
+        img = cv2.resize(base, (scaled_w, scaled_h), interpolation=cv2.INTER_LINEAR)
+        cw, ch = scaled_w / cols, scaled_h / rows
         # grid lines
         for r in range(1, rows):
-            y = int(r*ch)
-            cv2.line(img, (0,y), (w,y), GRID_COLOR, 1)
+            y = int(r * ch)
+            cv2.line(img, (0, y), (scaled_w, y), GRID_COLOR, 1)
         for c in range(1, cols):
-            x = int(c*cw)
-            cv2.line(img, (x,0), (x,h), GRID_COLOR, 1)
+            x = int(c * cw)
+            cv2.line(img, (x, 0), (x, scaled_h), GRID_COLOR, 1)
         # selected overlays
-        for (r,c) in selected:
-            x0, y0 = int(c*cw), int(r*ch)
-            x1, y1 = int((c+1)*cw), int((r+1)*ch)
+        for (r, c) in selected:
+            x0, y0 = int(c * cw), int(r * ch)
+            x1, y1 = int((c + 1) * cw), int((r + 1) * ch)
             overlay = img.copy()
-            cv2.rectangle(overlay, (x0,y0), (x1,y1), SELECTION_FILL, -1)
+            cv2.rectangle(overlay, (x0, y0), (x1, y1), SELECTION_FILL, -1)
             cv2.addWeighted(overlay, 0.3, img, 0.7, 0, img)
-            cv2.rectangle(img, (x0,y0), (x1,y1), SELECTION_BORDER, 2)
+            cv2.rectangle(img, (x0, y0), (x1, y1), SELECTION_BORDER, 2)
         # banner
-        cv2.rectangle(img, (0,0), (w,banner_h), BANNER_COLOR, -1)
+        cv2.rectangle(img, (0, 0), (scaled_w, banner_h), BANNER_COLOR, -1)
         # instructions text
         if FONT:
-            # PIL draw for Gotham Medium
             pil = Image.fromarray(img)
             draw = ImageDraw.Draw(pil)
-            # white text for contrast
-            draw.text((10, 7), instr, font=FONT, fill=(255,255,255))
+            draw.text((10, 7), instr, font=FONT, fill=(255, 255, 255))
             img = np.array(pil)
         else:
-            # fallback Hershey
-            cv2.putText(img, instr, (10,20),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 2)
-        return img
+            cv2.putText(img, instr, (10, 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        return img, cw, ch, scaled_w, scaled_h
 
     def on_mouse(evt, x, y, flags, param):
-        if y < banner_h: 
+        if y < banner_h:
             return  # ignore clicks on banner
-        r = int(y//ch); c = int(x//cw)
+        # adjust for scale
+        cw, ch = param['cw'], param['ch']
+        r = int((y) // ch)
+        c = int((x) // cw)
         if 0 <= r < rows and 0 <= c < cols:
             if evt == cv2.EVENT_LBUTTONDOWN:
-                selected.add((r,c))
+                selected.add((r, c))
             elif evt == cv2.EVENT_RBUTTONDOWN:
-                selected.discard((r,c))
+                selected.discard((r, c))
 
     cv2.namedWindow("Auto-Cropper", cv2.WINDOW_NORMAL)
-    cv2.setMouseCallback("Auto-Cropper", on_mouse)
+
+    mouse_param = {'cw': w / cols, 'ch': h / rows}
+    def mouse_callback(evt, x, y, flags, param):
+        # will update mouse_param each frame
+        on_mouse(evt, x, y, flags, mouse_param)
+    cv2.setMouseCallback("Auto-Cropper", mouse_callback)
 
     while True:
-        cv2.imshow("Auto-Cropper", draw_frame())
+        img, cw, ch, scaled_w, scaled_h = draw_frame()
+        mouse_param['cw'] = cw
+        mouse_param['ch'] = ch
+        cv2.imshow("Auto-Cropper", img)
         key = cv2.waitKey(20) & 0xFF
         if key == ord('s') or key == ord('q'):
             break
+        elif key == ord('+') or key == ord('='):
+            scale = min(max_scale, scale + 0.1)
+        elif key == ord('-'):
+            scale = max(min_scale, scale - 0.1)
     cv2.destroyAllWindows()
 
     if not selected:
@@ -149,13 +167,14 @@ def preview_and_crop(pdf_path, rows, cols):
         return
 
     out_dir = os.path.dirname(pdf_path)
-    stem   = os.path.splitext(os.path.basename(pdf_path))[0]
-    for idx, (r,c) in enumerate(selected, 1):
-        x0 = c*(pw/cols); y0 = r*(ph/rows)
-        rect = fitz.Rect(x0,y0,x0+(pw/cols),y0+(ph/rows))
+    stem = os.path.splitext(os.path.basename(pdf_path))[0]
+    for idx, (r, c) in enumerate(selected, 1):
+        x0 = c * (pw / cols)
+        y0 = r * (ph / rows)
+        rect = fitz.Rect(x0, y0, x0 + (pw / cols), y0 + (ph / rows))
         new = fitz.open()
-        pg  = new.new_page(width=rect.width, height=rect.height)
-        pg.show_pdf_page(fitz.Rect(0,0,rect.width,rect.height),
+        pg = new.new_page(width=rect.width, height=rect.height)
+        pg.show_pdf_page(fitz.Rect(0, 0, rect.width, rect.height),
                         doc, 0, clip=rect)
         name = f"{stem}_r{r}c{c}_cropped.pdf"
         new.save(os.path.join(out_dir, name))
