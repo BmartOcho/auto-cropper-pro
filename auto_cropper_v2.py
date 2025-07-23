@@ -67,19 +67,20 @@ class AutoCropperApp(ctk.CTk):
             return
 
         self.withdraw()
-        selections = self.run_crop_ui(img)
+        # Now returns selections and display size
+        selections, disp_w, disp_h = self.run_crop_ui(img)
         self.deiconify()
 
         if selections:
             out_dir = os.path.dirname(pdf_path)
             stem = os.path.splitext(os.path.basename(pdf_path))[0]
-            orig_h, orig_w = img.shape[:2]
-            ph, pw = page.rect.height, page.rect.width
+            pw, ph = page.rect.width, page.rect.height
             for idx, (y0, x0, y1, x1) in enumerate(selections, 1):
-                x0_pdf = x0 / orig_w * pw
-                y0_pdf = y0 / orig_h * ph
-                x1_pdf = x1 / orig_w * pw
-                y1_pdf = y1 / orig_h * ph
+                # Map display coords back to PDF points
+                x0_pdf = x0 / disp_w * pw
+                y0_pdf = y0 / disp_h * ph
+                x1_pdf = x1 / disp_w * pw
+                y1_pdf = y1 / disp_h * ph
                 rect = fitz.Rect(x0_pdf, y0_pdf, x1_pdf, y1_pdf)
 
                 new_doc = fitz.open()
@@ -109,16 +110,17 @@ class AutoCropperApp(ctk.CTk):
 
         # Resize PDF image
         base = cv2.resize(img, (disp_w, disp_h), interpolation=cv2.INTER_AREA)
-        selections, current = [], None
+        selections = []
+        current = None
         drawing = False
         mx = my = 0
 
         def draw_all():
-            # Empty canvas: banner + PDF region
+            # Canvas: PDF region + banner
             disp = np.zeros((disp_h + BANNER_HEIGHT, disp_w, 3), dtype=np.uint8)
-            # PDF region
             disp[BANNER_HEIGHT:, :] = base
-            # Banner
+            # PDF border and banner
+            cv2.rectangle(disp, (0, BANNER_HEIGHT), (disp_w-1, disp_h+BANNER_HEIGHT-1), RECT_BORDER, 2)
             cv2.rectangle(disp, (0,0), (disp_w, BANNER_HEIGHT), BANNER_COLOR, -1)
             instr = "Drag to draw | Right-click undo | S save | Q cancel"
             if FONT:
@@ -127,20 +129,18 @@ class AutoCropperApp(ctk.CTk):
                 draw.text((10, 10), instr, font=FONT, fill=TEXT_COLOR)
                 disp = cv2.cvtColor(np.array(pil), cv2.COLOR_RGB2BGR)
             else:
-                cv2.putText(disp, instr, (10, BANNER_HEIGHT - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, TEXT_COLOR, 2)
-            # PDF border
-            cv2.rectangle(disp, (0, BANNER_HEIGHT), (disp_w - 1, disp_h + BANNER_HEIGHT - 1), RECT_BORDER, 2)
-            # Draw existing selections
-            for (y0, x0, y1, x1) in selections:
+                cv2.putText(disp, instr, (10, BANNER_HEIGHT-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, TEXT_COLOR, 2)
+            # Draw selections
+            for y0, x0, y1, x1 in selections:
                 overlay = disp.copy()
-                cv2.rectangle(overlay, (x0, y0 + BANNER_HEIGHT), (x1, y1 + BANNER_HEIGHT), RECT_FILL, -1)
+                y0b, y1b = y0 + BANNER_HEIGHT, y1 + BANNER_HEIGHT
+                cv2.rectangle(overlay, (x0, y0b), (x1, y1b), RECT_FILL, -1)
                 cv2.addWeighted(overlay, 0.3, disp, 0.7, 0, disp)
-                cv2.rectangle(disp, (x0, y0 + BANNER_HEIGHT), (x1, y1 + BANNER_HEIGHT), RECT_BORDER, 2)
+                cv2.rectangle(disp, (x0, y0b), (x1, y1b), RECT_BORDER, 2)
             # Draw current rectangle
             if drawing and current:
                 y0, x0 = current
-                cv2.rectangle(disp, (x0, y0 + BANNER_HEIGHT), (mx, my + BANNER_HEIGHT), RECT_BORDER, 1)
+                cv2.rectangle(disp, (x0, y0+BANNER_HEIGHT), (mx, my+BANNER_HEIGHT), RECT_BORDER, 1)
             return disp
 
         def mouse_cb(event, x, y, flags, param):
@@ -149,18 +149,18 @@ class AutoCropperApp(ctk.CTk):
             x_ = x
             if y_ < 0 or x_ < 0 or x_ >= disp_w or y_ >= disp_h:
                 return
+            mx, my = x_, y_
             if event == cv2.EVENT_LBUTTONDOWN:
                 drawing = True
                 current = (y_, x_)
             elif event == cv2.EVENT_LBUTTONUP and drawing:
                 drawing = False
                 y0, x0 = current
-                selections.append((min(y0, y_), min(x0, x_), max(y0, y_), max(x0, x_)))
+                selections.append((min(y0, my), min(x0, mx), max(y0, my), max(x0, mx)))
                 current = None
             elif event == cv2.EVENT_RBUTTONDOWN:
                 if selections:
                     selections.pop()
-            mx, my = x_, y_
 
         win = "Crop Selector"
         cv2.namedWindow(win, cv2.WINDOW_NORMAL)
@@ -171,10 +171,10 @@ class AutoCropperApp(ctk.CTk):
             frame = draw_all()
             cv2.imshow(win, frame)
             key = cv2.waitKey(20) & 0xFF
-            if key == ord('s') or key == ord('q'):
+            if key in (ord('s'), ord('q')):
                 break
         cv2.destroyAllWindows()
-        return selections
+        return selections, disp_w, disp_h
 
 if __name__ == "__main__":
     app = AutoCropperApp()
