@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['auto-cropper.py'],
+    ['auto_cropper_v2.py'],
     pathex=[],
     binaries=[],
-    datas=[('Gotham-Medium.otf', '.'), ('C:\\Program Files\\Python312\\tcl\\tcl8.6', 'lib\\tcl8.6'), ('C:\\Program Files\\Python312\\tcl\\tk8.6', 'lib\\tk8.6')],
+    datas=[('GothamMedium.otf', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -35,5 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['auto-cropper.ico'],
+    icon=['app_icon.ico'],
 )
