@@ -7,6 +7,7 @@ import os
 import customtkinter as ctk  # For modern UI widgets and dialogs
 from tkinter import filedialog  # Kept for askopenfilename as CTk does not have its own
 from tkinter import Toplevel  # For creating custom top-level windows if needed
+from ctkmessagebox import CTkMessagebox as CTk  # CustomTkinter message box for better UI
 
 # ─── CustomTkinter Theme Setup ────────────────────────────────────────────────
 ctk.set_appearance_mode("System")  # "Light", "Dark", "System"
