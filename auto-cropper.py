@@ -89,7 +89,6 @@ def preview_and_crop(pdf_path, rows, cols):
     scale = 1.0  # initial scale
     min_scale = 0.2
     max_scale = 3.0
-
     selected = set()
     banner_h = 60
     instr = "L-click: select | R-click: deselect | S: save & exit | Q: cancel | +/-: zoom"
