@@ -83,13 +83,13 @@ def auto_detect_grid(img):
 
 # ─── Main Application Class ────────────────────────────────────────────────────
 class AutoCropperApp(ctk.CTk):
-    def __init__(self):
-        super().__init__()
+    def __init__(self):
+        super().__init__()
 
-        self.title("PDF Auto-Cropper 📐")
-        self.geometry("400x300") # Smaller initial window for settings gathering
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)
+        self.title("PDF Auto-Cropper 📐")
+        self.geometry("400x300") # Smaller initial window for settings gathering
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
 
         self.settings_frame = ctk.CTkFrame(self, corner_radius=10)
         self.settings_frame.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
@@ -241,7 +241,7 @@ class AutoCropperApp(ctk.CTk):
             cell_w_display = current_w_display / non_local_cols
             cell_h_display = current_h_display / non_local_rows
 
-            r = int((y - banner_h) // cell_h_display) if (y - banner_h) >=0 else int(y // cell_h_display)
+            r = int((y - banner_h) // cell_h_display) if (y - banner_h) >= 0 else int(y // cell_h_display)
             c = int(x // cell_w_display)
             
             if 0 <= r < non_local_rows and 0 <= c < non_local_cols:
