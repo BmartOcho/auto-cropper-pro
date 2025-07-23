@@ -4,10 +4,10 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont  # Pillow for image manipulation
 import os
 
-import customtkinter as ctk  # For modern UI widgets and dialogs
+import customtkinter as ctk
 from tkinter import filedialog  # Kept for askopenfilename as CTk does not have its own
 from tkinter import Toplevel  # For creating custom top-level windows if needed
-from ctkmessagebox import CTkMessagebox as CTk  # CustomTkinter message box for better UI
+#from ctkmessagebox import CTkMessagebox as CTk  # CustomTkinter message box for better UI
 
 # ─── CustomTkinter Theme Setup ────────────────────────────────────────────────
 ctk.set_appearance_mode("System")  # "Light", "Dark", "System"
@@ -113,7 +113,7 @@ class AutoCropperApp(ctk.CTk):
             filetypes=[("PDF files","*.pdf")])
         
         if not self.pdf_path:
-            ctk.CTkMessagebox(title="Cancelled", message="PDF selection cancelled.", icon="info")
+            ctk.CTkMessagebox(master=self, title="Cancelled", message="PDF selection cancelled.", icon="info")
             return
 
         try:
@@ -124,14 +124,14 @@ class AutoCropperApp(ctk.CTk):
             img = np.array(Image.frombytes("RGB", [pix.width, pix.height], pix.samples))
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) # Convert to BGR for OpenCV
         except Exception as e:
-            ctk.CTkMessagebox(title="Error", message=f"Failed to open PDF or render page: {e}", icon="cancel")
+            ctk.CTkMessagebox(master=self, title="Error", message=f"Failed to open PDF or render page: {e}", icon="cancel")
             return
 
         # Auto-detect grid
         auto_r, auto_c = auto_detect_grid(img)
 
         if auto_r and auto_c:
-            response = ctk.CTkMessagebox(
+            response = ctk.CTkMessagebox(master=self,
                 title="Confirm Grid",
                 message=f"Auto-detected {auto_r} rows × {auto_c} cols.\nIs that correct?",
                 icon="question", option_1="Yes", option_2="No")
@@ -141,7 +141,7 @@ class AutoCropperApp(ctk.CTk):
             else:
                 self.manual_grid_input()
         else:
-            ctk.CTkMessagebox(title="Detection Failed",
+            ctk.CTkMessagebox(master=self, title="Detection Failed",
                                 message="Could not auto-detect grid. Please enter manually.", icon="warning")
             self.manual_grid_input()
 
@@ -157,7 +157,7 @@ class AutoCropperApp(ctk.CTk):
             if self.rows is not None and self.rows < 1:
                 raise ValueError
         except (ValueError, TypeError):
-            ctk.CTkMessagebox(title="Invalid Input", message="Please enter a valid positive integer for rows.", icon="warning")
+            ctk.CTkMessagebox(master=self, title="Invalid Input", message="Please enter a valid positive integer for rows.", icon="warning")
             self.rows = None
             return # Exit if rows is invalid
 
@@ -168,7 +168,7 @@ class AutoCropperApp(ctk.CTk):
             if self.cols is not None and self.cols < 1:
                 raise ValueError
         except (ValueError, TypeError):
-            ctk.CTkMessagebox(title="Invalid Input", message="Please enter a valid positive integer for columns.", icon="warning")
+            ctk.CTkMessagebox(master=self, title="Invalid Input", message="Please enter a valid positive integer for columns.", icon="warning")
             self.cols = None
 
     def preview_and_crop_opencv(self):
@@ -278,7 +278,7 @@ class AutoCropperApp(ctk.CTk):
         self.deiconify() # Show the main CustomTkinter window again
 
         if not selected:
-            ctk.CTkMessagebox(title="No Selection", message="No selections made. No files saved.", icon="info")
+            ctk.CTkMessagebox(master=self, title="No Selection", message="No selections made. No files saved.", icon="info")
             return
 
         out_dir = os.path.dirname(self.pdf_path)
@@ -307,7 +307,7 @@ class AutoCropperApp(ctk.CTk):
             new_pdf.close() # Close the new PDF document
             print(f"Saved ({idx}/{len(selected)}): {name}")
         
-        ctk.CTkMessagebox(title="Cropping Complete", message=f"Successfully saved {len(selected)} cropped PDFs to:\n{out_dir}", icon="check")
+        ctk.CTkMessagebox(master=self, title="Cropping Complete", message=f"Successfully saved {len(selected)} cropped PDFs to:\n{out_dir}", icon="check")
         doc.close() # Close the original PDF document
 
 # ─── Entry Point ───────────────────────────────────────────────────────────────
