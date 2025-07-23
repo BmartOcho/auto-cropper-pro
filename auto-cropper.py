@@ -30,8 +30,12 @@ def auto_detect_grid(img):
     heights = [rh for (_,_,_,rh) in rects]
     widths = [rw for (_,_,rw,_) in rects]
     try:
-        rows = max(1, round(h / np.median(heights)))
-        cols = max(1, round(w / np.median(widths)))
+        median_height = np.median(heights)
+        median_width = np.median(widths)
+        if median_height == 0 or median_width == 0:
+            return None, None
+        rows = max(1, round(h / median_height))
+        cols = max(1, round(w / median_width))
     except Exception:
         return None, None
     return rows, cols
