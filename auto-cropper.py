@@ -17,7 +17,7 @@ SELECTION_BORDER = BANNER_COLOR
 try:
     FONT = ImageFont.truetype("Gotham-Medium.otf", 24)
 except IOError:
-    FONT = None  # Will fallback to cv2.putText
+    FONT = ImageFont.load_default()  # PIL default font fallback
 
 def auto_detect_grid(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -27,10 +27,13 @@ def auto_detect_grid(img):
     rects = [cv2.boundingRect(c) for c in cnts if cv2.contourArea(c) > h*w*0.005]
     if not rects:
         return None, None
-    hs = [rh for (_,_,_,rh) in rects]
-    ws = [rw for (_,_,rw,_) in rects]
-    rows = max(1, round(h / np.median(hs)))
-    cols = max(1, round(w / np.median(ws)))
+    heights = [rh for (_,_,_,rh) in rects]
+    widths = [rw for (_,_,rw,_) in rects]
+    try:
+        rows = max(1, round(h / np.median(heights)))
+        cols = max(1, round(w / np.median(widths)))
+    except Exception:
+        return None, None
     return rows, cols
 
 def gather_settings():
@@ -121,10 +124,11 @@ def preview_and_crop(pdf_path, rows, cols):
         if y < banner_h: 
             return  # ignore clicks on banner
         r = int(y//ch); c = int(x//cw)
-        if evt == cv2.EVENT_LBUTTONDOWN:
-            selected.add((r,c))
-        elif evt == cv2.EVENT_RBUTTONDOWN:
-            selected.discard((r,c))
+        if 0 <= r < rows and 0 <= c < cols:
+            if evt == cv2.EVENT_LBUTTONDOWN:
+                selected.add((r,c))
+            elif evt == cv2.EVENT_RBUTTONDOWN:
+                selected.discard((r,c))
 
     cv2.namedWindow("Auto-Cropper", cv2.WINDOW_NORMAL)
     cv2.setMouseCallback("Auto-Cropper", on_mouse)
@@ -137,12 +141,12 @@ def preview_and_crop(pdf_path, rows, cols):
     cv2.destroyAllWindows()
 
     if not selected:
-        print("No selections — nothing saved.")
+        messagebox.showinfo("No Selection", "No selections — nothing saved.")
         return
 
     out_dir = os.path.dirname(pdf_path)
     stem   = os.path.splitext(os.path.basename(pdf_path))[0]
-    for (r,c) in selected:
+    for idx, (r,c) in enumerate(selected, 1):
         x0 = c*(pw/cols); y0 = r*(ph/rows)
         rect = fitz.Rect(x0,y0,x0+(pw/cols),y0+(ph/rows))
         new = fitz.open()
@@ -151,7 +155,7 @@ def preview_and_crop(pdf_path, rows, cols):
                         doc, 0, clip=rect)
         name = f"{stem}_r{r}c{c}_cropped.pdf"
         new.save(os.path.join(out_dir, name))
-        print("Saved:", name)
+        print(f"Saved ({idx}/{len(selected)}): {name}")
 
 def main():
     settings = gather_settings()
